@@ -15,7 +15,7 @@ router.post('/register', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', async (req: Request, res: Response) => { 
   try {
     await loginUser(req, res);
   } catch (error) {
