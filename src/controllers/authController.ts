@@ -9,6 +9,7 @@ dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
+
 interface User {
   id: string;
   name: string;
@@ -45,6 +46,7 @@ export const registerUser = async (req: Request, res: Response) => {
       `CREATE (u:User {
         id: $id,
         name: $name, 
+        username: $name,
         email: $email, 
         password: $password,
         createdAt: datetime()
@@ -61,7 +63,7 @@ export const registerUser = async (req: Request, res: Response) => {
     
     // Create JWT token
     const token = jwt.sign(
-      { userId: user.id },
+      { userId: user.id, username: user.name },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -115,7 +117,7 @@ export const loginUser = async (req: Request, res: Response) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { userId: user.id },
+      { userId: user.id, username: user.name },
       JWT_SECRET,
       { expiresIn: '24h' }
     );

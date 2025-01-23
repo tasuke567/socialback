@@ -1,15 +1,12 @@
-import express from 'express';
-import { searchUsers } from '../controllers/userController';
+// src/routes/userRoutes.ts
+import express from "express";
+import { getUserProfile } from "../controllers/userController";
+import { searchFriends } from "../controllers/friendsController";
+import asyncHandler from "../utils/asyncHandler";
 
 const router = express.Router();
 
-// เพิ่มการใช้ฟังก์ชัน searchUsers ใน route
-router.get('/search', async (req, res) => {
-  try {
-    await searchUsers(req, res); // เรียกใช้ฟังก์ชันที่กำหนดใน controller
-  } catch (error) {
-    res.status(500).json({ message: 'Internal server error', error });
-  }
-});
+router.get("/:userId", getUserProfile);
+router.get('/find', asyncHandler(searchFriends));
 
 export default router;

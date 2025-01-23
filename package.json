@@ -17,6 +17,8 @@
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "neo4j-driver": "^5.27.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
     "uuid": "^11.0.5"
   },
   "devDependencies": {

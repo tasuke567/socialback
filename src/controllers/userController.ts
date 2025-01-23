@@ -1,30 +1,33 @@
-import { Request, Response } from 'express';
-import { session } from '../database/neo4j';
+// src/controllers/userController.ts
+import { Request, Response } from "express";
+import { withSession } from "../services/session"; // ใช้ session management
+import { errorHandler } from "../utils/errorHandler"; // error handler
 
-export const searchUsers = async (req: Request, res: Response) => {
-  const query = req.query.query as string;
-
-  if (!query) {
-    return res.status(400).json({ message: 'Query parameter is required.' });
-  }
-
+export const getUserProfile = async (req: Request, res: Response): Promise<void> => {
   try {
-    const result = await session.run(
-      `MATCH (user:User)
-       WHERE user.name CONTAINS $query OR user.email CONTAINS $query
-       RETURN user`,
-      { query }
-    );
+    const { userId } = req.params;
 
-    const users = result.records.map(record => record.get('user').properties);
-
-    if (users.length === 0) {
-      return res.status(404).json({ message: 'No users found.' });
+    if (!userId) {
+      res.status(400).json({ message: "User ID is required." });
+      return;
     }
 
-    res.status(200).json({ users });
-  } catch (error: any) {
-    console.error('Error searching users:', error);
-    res.status(500).json({ message: 'Error searching users', error: error.message });
+    const userProfile = await withSession(async (session) => {
+      const result = await session.run(
+        `MATCH (u:User {id: $userId}) RETURN u`,
+        { userId }
+      );
+
+      return result.records[0]?.get("u")?.properties;
+    });
+
+    if (!userProfile) {
+      res.status(404).json({ message: "User not found." });
+      return;
+    }
+
+    res.status(200).json({ userProfile });
+  } catch (error) {
+    errorHandler(error, res);
   }
 };
