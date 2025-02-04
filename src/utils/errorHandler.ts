@@ -1,10 +1,18 @@
-// src/utils/errorHandler.ts
-import { Response } from "express";
+// utils/asyncHandler.ts
+import { Request, Response, NextFunction } from "express";
+import { ParamsDictionary } from 'express-serve-static-core';
+import * as QueryString from 'qs';
 
-// ฟังก์ชันสำหรับจัดการ error และส่งข้อความ error กลับไปยัง client
-export const errorHandler = (error: any, res: Response): void => {
-  console.error("Error:", error);
-  const status = error.status || 500;
-  const message = error.status ? error.message : "Internal Server Error";
-  res.status(status).json({ message, error: error.message });
+const asyncHandler = (
+  fn: (
+    req: Request<ParamsDictionary, any, any, QueryString.ParsedQs>,
+    res: Response,
+    next: NextFunction
+  ) => Promise<void>
+) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
 };
+
+export default asyncHandler;

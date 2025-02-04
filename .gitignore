@@ -1,32 +1,33 @@
-# Node modules
-node_modules/
+HELP.md
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
 
-# Log files
-*.log
-npm-debug.log*
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
 
-# Environment variables
-.env
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
 
-# Build output
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
 /dist/
-/build/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
 
-# IDE or editor files
+### VS Code ###
 .vscode/
-.idea/
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Coverage directory (for tests)
-coverage/
-
-# Dependency directories
-/.pnp/
-/.pnp.js
-
-# Docker
-.docker/
-docker-compose.override.yml
