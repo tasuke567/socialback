@@ -10,6 +10,7 @@ import org.springframework.data.neo4j.core.Neo4jTemplate;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/posts")
@@ -36,14 +37,14 @@ public class PostController {
         if (post.getCreatedAt() == null) {
             post.setCreatedAt(new Date());
         }
-        // บันทึกโพสต์และคืนค่าผลลัพธ์
+        // Save and return the post
         Post savedPost = postRepository.save(post);
         return ResponseEntity.status(HttpStatus.CREATED).body(savedPost);
     }
 
     // Update an existing post
     @PutMapping("/{postId}")
-    public ResponseEntity<Post> updatePost(@PathVariable Long postId, @RequestBody Post updatedPost) {
+    public ResponseEntity<Post> updatePost(@PathVariable UUID postId, @RequestBody Post updatedPost) {
         Optional<Post> existingPostOptional = postRepository.findById(postId);
 
         if (existingPostOptional.isPresent()) {
@@ -59,20 +60,27 @@ public class PostController {
 
     // Delete a post
     @DeleteMapping("/{postId}")
-    public ResponseEntity<Void> deletePost(@PathVariable Long postId, @RequestParam Long userId) {
-        Optional<Post> postOptional = neo4jTemplate.findById(postId, Post.class);
+    public ResponseEntity<Void> deletePost(@PathVariable UUID postId, @RequestParam String userId) {
+        try {
+            UUID parsedUserId = UUID.fromString(userId); // Convert string to UUID
+            Optional<Post> postOptional = neo4jTemplate.findById(postId, Post.class);
 
-        if (postOptional.isPresent()) {
-            Post post = postOptional.get();
+            if (postOptional.isPresent()) {
+                Post post = postOptional.get();
 
-            if (post.getUserId().equals(userId)) {
-                postRepository.deleteById(postId);
-                return ResponseEntity.ok().build();
+                // Compare the UUID of userId
+                if (post.getUserId().equals(parsedUserId)) {
+                    postRepository.deleteById(postId);
+                    return ResponseEntity.ok().build();
+                }
+
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build(); // If userId doesn't match
             }
 
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build(); // ถ้า userId ไม่ตรงกัน
+            return ResponseEntity.notFound().build(); // If post not found
+        } catch (IllegalArgumentException e) {
+            // Return 400 Bad Request if UUID conversion fails
+            return ResponseEntity.badRequest().build();
         }
-
-        return ResponseEntity.notFound().build(); // ถ้าโพสต์ไม่พบ
     }
 }

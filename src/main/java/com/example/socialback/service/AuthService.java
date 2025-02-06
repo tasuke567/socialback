@@ -18,7 +18,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -37,49 +36,57 @@ public class AuthService {
     @Autowired
     private JwtUtil jwtUtil;
 
-
-    // อาจมี dependency เช่น UserRepository, PasswordEncoder, JwtProvider เป็นต้น
-
+    // Register a new user
     public ResponseEntity<?> register(RegisterRequest request) {
-        // ตรวจสอบว่ามีผู้ใช้อยู่แล้วหรือไม่
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Email is already in use.");
-        }
+        // Check if email is already in use
+        userRepository.findByEmail(request.getEmail()).ifPresent(user -> {
+            throw new RuntimeException("Email is already in use.");
+        });
 
-        // สร้างผู้ใช้ใหม่ (อาจรวมถึงการเข้ารหัส password)
+        // Create a new User instance and populate its fields
         User newUser = new User();
         newUser.setUsername(request.getUsername());
         newUser.setEmail(request.getEmail());
         newUser.setPassword(passwordEncoder.encode(request.getPassword()));
+        newUser.setFirstName(request.getFirstName());
+        newUser.setLastName(request.getLastName());
         newUser.setCreatedAt(new Date());
         newUser.setUpdatedAt(new Date());
-        // บันทึกผู้ใช้ใหม่
+
         User savedUser = userRepository.save(newUser);
 
-        // หากต้องการให้ล็อกอินอัตโนมัติ ให้สร้าง token
+// ตรวจสอบว่า ID ถูกกำหนด
+        if (savedUser.getId() == null) {
+            throw new RuntimeException("User ID is not generated");
+        }
+
         String token = jwtUtil.generateToken(
                 (UserDetails) userRepository.findByUsername(savedUser.getUsername())
                         .orElseThrow(() -> new RuntimeException("User not found")),
                 savedUser.getId().toString()
         );
 
-        // สร้าง response DTO ที่จะส่งกลับ
-        RegisterRequest authResponse = new RegisterRequest(token, savedUser.getUsername(), savedUser.getEmail());
-        return ResponseEntity.ok(authResponse);
-    }
+        return ResponseEntity.ok(Map.of(
+                "token", token,
+                "username", savedUser.getUsername(),
+                "email", savedUser.getEmail()
+        ));
 
+    }
 
     // Login user
     public ResponseEntity<?> login(LoginRequest request) {
         try {
+            // Check if user exists by username
             Optional<User> userOpt = userRepository.findByUsername(request.getUsername());
             if (userOpt.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                         .body(Map.of("message", "User not found"));
             }
 
+            // Authenticate user using the provided credentials
             Authentication authentication = authenticateUser(request.getUsername(), request.getPassword());
+            // Generate token for authenticated user
             String token = generateTokenForUser(authentication);
 
             return ResponseEntity.ok(Map.of("token", token));
@@ -97,17 +104,21 @@ public class AuthService {
         );
     }
 
-    // Generate JWT token for authenticated user
+    // Generate JWT token for an authenticated user
     private String generateTokenForUser(Authentication authentication) {
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
         User user = userRepository.findByUsername(userDetails.getUsername())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Generate token with userId
+        if (user.getId() == null) {
+            throw new RuntimeException("User ID is null");
+        }
+
         return jwtUtil.generateToken(userDetails, user.getId().toString());
     }
 
-    // Get current logged-in user
+
+    // Retrieve the current logged-in user from a given token
     public ResponseEntity<?> getCurrentUser(String token) {
         try {
             String email = jwtUtil.extractUsername(token);
@@ -115,11 +126,12 @@ public class AuthService {
                     .orElseThrow(() -> new RuntimeException("User not found"));
             return ResponseEntity.ok(user);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Invalid or expired token"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Invalid or expired token"));
         }
     }
 
-    // Logout user
+    // Logout user by clearing the security context
     public ResponseEntity<?> logout() {
         SecurityContextHolder.clearContext();
         return ResponseEntity.ok("Logged out successfully");

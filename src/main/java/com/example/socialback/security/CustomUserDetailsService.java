@@ -1,6 +1,6 @@
 package com.example.socialback.security;
 
-import com.example.socialback.model.User;
+
 import com.example.socialback.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;

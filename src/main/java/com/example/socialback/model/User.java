@@ -1,85 +1,122 @@
 package com.example.socialback.model;
 
-import lombok.Getter;
-import lombok.Setter;
-import org.springframework.data.annotation.Transient;
-import org.springframework.data.neo4j.core.schema.GeneratedValue;
-import org.springframework.data.neo4j.core.schema.Node;
-import org.springframework.data.neo4j.core.schema.Id;
-import org.springframework.data.neo4j.core.schema.Property;
+import jakarta.validation.constraints.*;
+import lombok.*;
+import org.springframework.data.neo4j.core.schema.*;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.util.Collection;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Node("User")
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class User implements UserDetails {
     @Id
     @GeneratedValue
-    @Getter
-    private Long id;  // Mapped to Neo4j's internal elementId
+    private UUID id;
 
-    @Property(name = "firstName")
-    @Getter @Setter
+    @NotBlank(message = "First name is required")
+    @Size(max = 50)
     private String firstName;
 
-    @Property(name = "lastName")
-    @Getter @Setter
+    @NotBlank(message = "Last name is required")
+    @Size(max = 50)
     private String lastName;
 
-    @Property(name = "profilePicture")
-    @Getter @Setter
     private String profilePicture;
 
-    @Property(name = "username")
-    @Getter @Setter
+    @NotBlank
+    @Size(min = 3, max = 20)
     private String username;
 
-    @Getter @Setter
+    @NotBlank
+    @Size(min = 8)
     private String password;
 
-    @Getter @Setter
+    @NotBlank
+    @Email
     private String email;
 
-    @Getter @Setter
+    @Builder.Default
+    private List<String> interests = new ArrayList<>();
+
+    @Builder.Default
     private List<String> roles = List.of("ROLE_USER");
 
-    @Getter @Setter
-    private Date createdAt;
+    @Builder.Default
+    private Date createdAt = new Date();
 
-    @Getter @Setter
-    private Date updatedAt;
+    @Builder.Default
+    private Date updatedAt = new Date();
 
-    @Transient
+    @Builder.Default
+    private boolean accountNonExpired = true;
+
+    @Builder.Default
+    private boolean accountNonLocked = true;
+
+    @Builder.Default
+    private boolean credentialsNonExpired = true;
+
+    @Builder.Default
+    private boolean enabled = true;
+
+    // ความสัมพันธ์เพื่อน (UNDIRECTED)
+    @Relationship(type = "FRIEND_WITH", direction = Relationship.Direction.OUTGOING)
+    @Builder.Default
+    private Set<User> friends = new HashSet<>();
+
+    // // ความสัมพันธ์คำขอเป็นเพื่อน
+    // @Relationship(type = "FRIEND_REQUEST", direction = Relationship.Direction.OUTGOING)
+    // @Builder.Default
+    // private Set<FriendRequest> friendRequests = new HashSet<>();
+
+    // // ฟังก์ชันจัดการเพื่อน
+    // public void sendFriendRequest(User toUser) {
+    //     FriendRequest friendRequest = new FriendRequest(this, toUser, FriendshipStatus.PENDING, new Date());
+    //     friendRequests.add(friendRequest);
+    // }
+
+    // public void acceptFriendRequest(User fromUser) {
+    //     friendRequests.removeIf(req -> req.getFromUser().equals(fromUser));
+    //     friends.add(fromUser);
+    //     fromUser.getFriends().add(this);
+    // }
+
+    // public void rejectFriendRequest(User fromUser) {
+    //     friendRequests.removeIf(req -> req.getFromUser().equals(fromUser));
+    // }
+
+    public boolean isFriendWith(User user) {
+        return friends.contains(user);
+    }
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return roles.stream()
-                .map(SimpleGrantedAuthority::new)
-                .collect(Collectors.toList());
-    }
-
-    // Implement methods from UserDetails
-    @Override
-    public boolean isAccountNonExpired() {
-        return true;  // หรือปรับตามเงื่อนไขของระบบคุณ
+        return roles.stream().map(SimpleGrantedAuthority::new).collect(Collectors.toList());
     }
 
     @Override
-    public boolean isAccountNonLocked() {
-        return true;  // หรือปรับตามเงื่อนไขของระบบคุณ
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        User user = (User) o;
+        return Objects.equals(id, user.id);
     }
 
     @Override
-    public boolean isCredentialsNonExpired() {
-        return true;  // หรือปรับตามเงื่อนไขของระบบคุณ
+    public int hashCode() {
+        return Objects.hash(id);
     }
 
     @Override
-    public boolean isEnabled() {
-        return true;  // หรือปรับตามเงื่อนไขของระบบคุณ
+    public String getUsername() {
+        return username;
     }
 }

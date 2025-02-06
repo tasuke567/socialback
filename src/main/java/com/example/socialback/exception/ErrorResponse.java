@@ -1,20 +1,17 @@
 package com.example.socialback.exception;
 
-import lombok.Getter;
-import org.springframework.http.HttpStatus;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import lombok.Builder;
+import lombok.Data;
+
 import java.time.LocalDateTime;
 
-@Getter
+@Data
+@Builder
 public class ErrorResponse {
-    private final HttpStatus status;
-    private final String message;
-    private final String details;
-    private final LocalDateTime timestamp;
-
-    public ErrorResponse(HttpStatus status, String message, String details) {
-        this.status = status;
-        this.message = message;
-        this.details = details;
-        this.timestamp = LocalDateTime.now();
-    }
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime timestamp;
+    private int status;
+    private String error;
+    private String message;
 }

@@ -1,5 +1,7 @@
 package com.example.socialback.security;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -19,6 +21,8 @@ import java.util.Collection;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
+    private static final Logger logger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
+
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
 
@@ -37,17 +41,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String jwt = extractJwtFromRequest(request);
 
         if (jwt != null && jwtUtil.validateTokenStructure(jwt)) {
+            logger.info("JWT token structure is valid.");
             String username = jwtUtil.extractUsername(jwt);
 
-
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                logger.info("Username extracted from token: {}", username);
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-                // Pass userId along with userDetails to validate the token
                 if (jwtUtil.validateToken(jwt, userDetails)) {
+                    logger.info("JWT token validated successfully for user: {}", username);
                     setAuthenticationInContext(request, userDetails);
+                } else {
+                    logger.warn("JWT token validation failed for user: {}", username);
                 }
+            } else {
+                logger.warn("Username is null or authentication context is already set.");
             }
+        } else {
+            logger.warn("JWT token is either null or invalid structure.");
         }
 
         // Proceed with the request
@@ -83,6 +94,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // Setting the authentication object in the context
         SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        // Debug log
+        logger.info("Authentication set in context for user: {}", userDetails.getUsername());
     }
+
 }
 
