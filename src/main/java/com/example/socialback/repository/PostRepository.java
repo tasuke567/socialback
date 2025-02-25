@@ -1,9 +1,12 @@
 package com.example.socialback.repository;
 
-import com.example.socialback.model.Post;
-import org.springframework.data.neo4j.repository.Neo4jRepository;
+import com.example.socialback.entity.PostEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
 import java.util.UUID;
 
-public interface PostRepository extends Neo4jRepository<Post, UUID> {
+@Repository
+public interface PostRepository extends JpaRepository<PostEntity, UUID> {
+    // สามารถเพิ่ม query method หรือ custom query ได้ถ้าจำเป็น
 }
