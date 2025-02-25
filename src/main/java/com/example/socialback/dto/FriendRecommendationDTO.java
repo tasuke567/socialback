@@ -1,16 +1,13 @@
-// FriendRecommendationDTO.java
 package com.example.socialback.dto;
 
-import com.example.socialback.model.User;
-import lombok.*;
+import com.example.socialback.entity.UserEntity;
+
+import lombok.Builder;
+import lombok.Data;
 
 @Data
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class FriendRecommendationDTO {
-    private User user;
-    private Double score;
-    private int mutualFriends;
-    private int commonInterests;
+    private UserEntity user;  // User ที่แนะนำ
+    private Double score;  // คะแนนในการแนะนำ
 }

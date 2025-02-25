@@ -2,11 +2,10 @@ package com.example.socialback.service;
 
 import com.example.socialback.dto.LoginRequest;
 import com.example.socialback.dto.RegisterRequest;
-import com.example.socialback.model.User;
+import com.example.socialback.entity.UserEntity;
 import com.example.socialback.repository.UserRepository;
 import com.example.socialback.security.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -16,10 +15,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
 
-import java.util.Date;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Map;
-import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class AuthService {
@@ -28,7 +29,7 @@ public class AuthService {
     private AuthenticationManager authenticationManager;
 
     @Autowired
-    private UserRepository userRepository;
+    private UserRepository userRepository;  // JPA Repo ของ UserEntity
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -36,104 +37,88 @@ public class AuthService {
     @Autowired
     private JwtUtil jwtUtil;
 
-    // Register a new user
     public ResponseEntity<?> register(RegisterRequest request) {
-        // Check if email is already in use
-        userRepository.findByEmail(request.getEmail()).ifPresent(user -> {
+        userRepository.findByEmail(request.getEmail()).ifPresent(u -> {
             throw new RuntimeException("Email is already in use.");
         });
 
-        // Create a new User instance and populate its fields
-        User newUser = new User();
-        newUser.setUsername(request.getUsername());
-        newUser.setEmail(request.getEmail());
-        newUser.setPassword(passwordEncoder.encode(request.getPassword()));
-        newUser.setFirstName(request.getFirstName());
-        newUser.setLastName(request.getLastName());
-        newUser.setCreatedAt(new Date());
-        newUser.setUpdatedAt(new Date());
+        // สร้าง UserEntity แทน
+        UserEntity newUser = UserEntity.builder()
+                .username(request.getUsername())
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .roles("ROLE_USER")
+                .build();
 
-        User savedUser = userRepository.save(newUser);
+        UserEntity savedUser = userRepository.save(newUser);
 
-// ตรวจสอบว่า ID ถูกกำหนด
-        if (savedUser.getId() == null) {
-            throw new RuntimeException("User ID is not generated");
-        }
-
-        String token = jwtUtil.generateToken(
-                (UserDetails) userRepository.findByUsername(savedUser.getUsername())
-                        .orElseThrow(() -> new RuntimeException("User not found")),
-                savedUser.getId().toString()
+        // Create UserDetails from savedUser
+        UserDetails userDetails = new org.springframework.security.core.userdetails.User(
+                savedUser.getUsername(), 
+                savedUser.getPassword(), 
+                new ArrayList<>() // Add authorities if needed
         );
 
-        return ResponseEntity.ok(Map.of(
-                "token", token,
-                "username", savedUser.getUsername(),
-                "email", savedUser.getEmail()
-        ));
-
+        // Generate token using UserDetails
+        String token = jwtUtil.generateToken(userDetails, savedUser.getId().toString());
+        return ResponseEntity.ok(Map.of("token", token));
     }
 
-    // Login user
     public ResponseEntity<?> login(LoginRequest request) {
-        try {
-            // Check if user exists by username
-            Optional<User> userOpt = userRepository.findByUsername(request.getUsername());
-            if (userOpt.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("message", "User not found"));
-            }
-
-            // Authenticate user using the provided credentials
-            Authentication authentication = authenticateUser(request.getUsername(), request.getPassword());
-            // Generate token for authenticated user
-            String token = generateTokenForUser(authentication);
-
-            return ResponseEntity.ok(Map.of("token", token));
-
-        } catch (BadCredentialsException ex) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", "Bad credentials"));
-        }
-    }
-
-    // Authenticate user with username and password
-    private Authentication authenticateUser(String username, String password) {
-        return authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(username, password)
-        );
-    }
-
-    // Generate JWT token for an authenticated user
-    private String generateTokenForUser(Authentication authentication) {
-        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-        User user = userRepository.findByUsername(userDetails.getUsername())
+        // หาใน DB
+        UserEntity user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (user.getId() == null) {
-            throw new RuntimeException("User ID is null");
+        // Check if the user has the required role (e.g., "ROLE_USER")
+        if (!user.getRoles().contains("ROLE_USER")) { // Assuming roles are stored as a List<String>
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Access denied"));
         }
 
-        return jwtUtil.generateToken(userDetails, user.getId().toString());
-    }
-
-
-    // Retrieve the current logged-in user from a given token
-    public ResponseEntity<?> getCurrentUser(String token) {
         try {
-            String email = jwtUtil.extractUsername(token);
-            User user = userRepository.findByEmail(email)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
-            return ResponseEntity.ok(user);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message", "Invalid or expired token"));
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
+            );
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
+            // Create UserDetails from user
+            UserDetails userDetails = new org.springframework.security.core.userdetails.User(
+                    user.getUsername(), 
+                    user.getPassword(), 
+                    new ArrayList<>() // Add authorities if needed
+            );
+
+            // Generate token using UserDetails
+            String token = jwtUtil.generateToken(userDetails, user.getId().toString());
+            return ResponseEntity.ok(Map.of("token", token));
+
+        } catch (BadCredentialsException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Bad credentials"));
         }
     }
 
-    // Logout user by clearing the security context
-    public ResponseEntity<?> logout() {
-        SecurityContextHolder.clearContext();
-        return ResponseEntity.ok("Logged out successfully");
+    public ResponseEntity<?> getCurrentUser(String token) {
+        // Validate the token and extract user information
+        String username = jwtUtil.extractUsername(token); // Assuming you have a JwtUtil for token handling
+        UserEntity user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return ResponseEntity.ok(user);
+    }
+
+    public ResponseEntity<UserEntity> getUserId(String token) {
+        String userId = jwtUtil.extractUserId(token); 
+        UserEntity user = userRepository.findById(UUID.fromString(userId))
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        return ResponseEntity.ok(user);
+    }
+
+    public String getToken(UserDetails userDetails) {
+        // Assuming you have a way to get the token from the SecurityContext or another source
+        // This is a placeholder; you may need to adjust based on your actual implementation
+        return SecurityContextHolder.getContext().getAuthentication().getCredentials().toString();
     }
 }

@@ -38,7 +38,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
 
+        String requestURI = request.getRequestURI();
+
+        // ข้ามการตรวจสอบ JWT สำหรับ API บางตัว เช่น /api/auth/register, /api/auth/login
+        if (requestURI.startsWith("/api/auth/")) {
+            logger.debug("Skipping JWT authentication for: " + requestURI);
+            chain.doFilter(request, response);
+            return;
+        }
+
         String jwt = extractJwtFromRequest(request);
+        logger.debug("Extracted JWT: {}", jwt);
 
         if (jwt != null && jwtUtil.validateTokenStructure(jwt)) {
             logger.info("JWT token structure is valid.");
@@ -50,7 +60,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 if (jwtUtil.validateToken(jwt, userDetails)) {
                     logger.info("JWT token validated successfully for user: {}", username);
-                    setAuthenticationInContext(request, userDetails);
+                    setAuthenticationInContext(request, userDetails, jwt);
                 } else {
                     logger.warn("JWT token validation failed for user: {}", username);
                 }
@@ -58,12 +68,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 logger.warn("Username is null or authentication context is already set.");
             }
         } else {
-            logger.warn("JWT token is either null or invalid structure.");
+            logger.warn("JWT token is either null or missing in request.");
         }
 
-        // Proceed with the request
         chain.doFilter(request, response);
     }
+
 
     /**
      * Extracts the JWT token from the request's Authorization header.
@@ -72,8 +82,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      */
     private String extractJwtFromRequest(HttpServletRequest request) {
         String bearerToken = request.getHeader(AUTHORIZATION_HEADER);
+        logger.debug("Extracted Bearer Token: {}", bearerToken);
+
         if (bearerToken != null && bearerToken.startsWith(BEARER_PREFIX)) {
-            return bearerToken.substring(BEARER_PREFIX.length());
+            return bearerToken.substring(BEARER_PREFIX.length()).trim();
         }
         return null;
     }
@@ -83,11 +95,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      * @param request the HTTP request
      * @param userDetails the UserDetails object to be used for authentication
      */
-    private void setAuthenticationInContext(HttpServletRequest request, UserDetails userDetails) {
+    private void setAuthenticationInContext(HttpServletRequest request, UserDetails userDetails, String jwtToken) {
         Collection<? extends GrantedAuthority> authorities = userDetails.getAuthorities();
 
         UsernamePasswordAuthenticationToken authentication =
-                new UsernamePasswordAuthenticationToken(userDetails, null, authorities);
+                new UsernamePasswordAuthenticationToken(userDetails, jwtToken, authorities);
 
         // Adding details like remote IP address into the authentication object
         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
@@ -100,4 +112,3 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
 }
-

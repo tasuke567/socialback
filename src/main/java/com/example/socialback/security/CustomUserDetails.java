@@ -1,17 +1,19 @@
 package com.example.socialback.security;
 
-import com.example.socialback.model.User;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import com.example.socialback.entity.UserEntity;
+
 import java.util.Collection;
 import java.util.stream.Collectors;
+import java.util.Arrays;
 
 public class CustomUserDetails implements UserDetails {
-    private final User user;
+    private final UserEntity user;
 
-    public CustomUserDetails(User user) {
+    public CustomUserDetails(UserEntity user) {
         this.user = user;
     }
 
@@ -53,7 +55,7 @@ public class CustomUserDetails implements UserDetails {
     }
 
     // คุณสามารถเพิ่ม getter สำหรับ User หากต้องการเข้าถึง object นี้ในภายหลัง
-    public User getUser() {
+    public UserEntity getUser() {
         return user;
     }
 }

@@ -1,8 +1,6 @@
 package com.example.socialback.security;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -24,7 +22,7 @@ public class JwtUtil {
     private long expirationTime; // In milliseconds
 
     private SecretKey getSigningKey() {
-        if (secretKey.length() < 32) { // Ensure the secret key is at least 256 bits (32 bytes)
+        if (secretKey.length() < 32) {
             throw new IllegalArgumentException("JWT secret key must be at least 256 bits");
         }
         return Keys.hmacShaKeyFor(secretKey.getBytes());
@@ -71,18 +69,37 @@ public class JwtUtil {
                 .compact();
     }
 
-    // Validation method to check username and userId
     public boolean validateToken(String token, UserDetails userDetails) {
-        final String username = extractUsername(token);
-        return username.equals(userDetails.getUsername())  && !isTokenExpired(token);
+        try {
+            final String username = extractUsername(token);
+            return username.equals(userDetails.getUsername()) && !isTokenExpired(token);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
-    // Extract the userId from the token
     public String extractUserId(String token) {
         return extractClaim(token, claims -> claims.get("userId").toString());
     }
 
     public boolean validateTokenStructure(String token) {
-        return token != null && token.split("\\.").length == 3;
+        try {
+            Jws<Claims> claims = Jwts.parserBuilder()
+                    .setSigningKey(getSigningKey())
+                    .build()
+                    .parseClaimsJws(token);
+            return claims != null;
+        } catch (ExpiredJwtException e) {
+            System.out.println("JWT Expired: " + e.getMessage());
+        } catch (UnsupportedJwtException e) {
+            System.out.println("Unsupported JWT: " + e.getMessage());
+        } catch (MalformedJwtException e) {
+            System.out.println("Malformed JWT: " + e.getMessage());
+        } catch (SignatureException e) {
+            System.out.println("Invalid JWT Signature: " + e.getMessage());
+        } catch (Exception e) {
+            System.out.println("Invalid JWT: " + e.getMessage());
+        }
+        return false;
     }
 }

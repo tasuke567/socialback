@@ -1,8 +1,8 @@
 package com.example.socialback.controller;
 
 import com.example.socialback.dto.FriendRequestDTO;
-import com.example.socialback.model.FriendRequestResult;
-import com.example.socialback.model.User;
+import com.example.socialback.service.FriendRequestResult;
+import com.example.socialback.entity.UserEntity;
 import com.example.socialback.service.FriendService;
 import com.example.socialback.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -16,8 +16,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
-import static org.springframework.data.neo4j.core.Neo4jClient.log;
-
 @RestController
 @RequestMapping("/api/friends")
 @RequiredArgsConstructor
@@ -30,14 +28,14 @@ public class FriendController {
     private final UserService userService; // Add this
 
     @GetMapping
-    public ResponseEntity<List<User>> getCurrentUserFriends(
+    public ResponseEntity<List<UserEntity>> getCurrentUserFriends(
             @AuthenticationPrincipal UserDetails userDetails) {
-        User currentUser = userService.findByUsername(userDetails.getUsername());
+        UserEntity currentUser = userService.findByUsername(userDetails.getUsername());
         return ResponseEntity.ok(friendService.getUserFriends(currentUser.getId()));
     }
 
     @GetMapping("/{userId}")
-    public ResponseEntity<List<User>> getUserFriends(@PathVariable UUID userId) {
+    public ResponseEntity<List<UserEntity>> getUserFriends(@PathVariable UUID userId) {
         return ResponseEntity.ok(friendService.getUserFriends(userId));
     }
 
@@ -48,7 +46,7 @@ public class FriendController {
         // Logging request receipt
         logger.debug("Received POST /api/friends/request with payload: {}", request);
 
-        User currentUser = userService.findByUsername(userDetails.getUsername());
+        UserEntity currentUser = userService.findByUsername(userDetails.getUsername());
         try {
             UUID fromUserId = currentUser.getId();  // จากการตรวจสอบ Username และดึงข้อมูลผู้ใช้
             UUID toUserId = UUID.fromString(request.getToUserId());
@@ -66,6 +64,26 @@ public class FriendController {
         }
     }
 
+    @DeleteMapping("/request/{requestId}")
+    public ResponseEntity<?> cancelFriendRequest(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable UUID requestId) {
+        UserEntity currentUser = userService.findByUsername(userDetails.getUsername());
+
+        logger.info("User {} is trying to cancel friend request {}", currentUser.getId(), requestId);
+
+
+
+        boolean success = friendService.cancelFriendRequest(requestId, currentUser.getId());
+
+        if (success) {
+            return ResponseEntity.ok("Friend request canceled successfully");
+        } else {
+            return ResponseEntity.badRequest().body("Friend request not found or not allowed to cancel");
+        }
+    }
+
+
 
 
     @DeleteMapping("/{friendId}")
@@ -73,7 +91,7 @@ public class FriendController {
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable UUID friendId
     ) {
-        User currentUser = userService.findByUsername(userDetails.getUsername());
+        UserEntity currentUser = userService.findByUsername(userDetails.getUsername());
         friendService.removeFriend(currentUser.getId(), friendId);
         return ResponseEntity.ok().build();
     }
@@ -83,7 +101,7 @@ public class FriendController {
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable UUID friendId
     ) {
-        User currentUser = userService.findByUsername(userDetails.getUsername());
+        UserEntity currentUser = userService.findByUsername(userDetails.getUsername());
         return ResponseEntity.ok(friendService.checkFriendship(currentUser.getId(), friendId));
     }
 
@@ -91,9 +109,9 @@ public class FriendController {
     public ResponseEntity<?> acceptFriendRequest(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable UUID requestId) {
-        User currentUser = userService.findByUsername(userDetails.getUsername());
+        UserEntity currentUser = userService.findByUsername(userDetails.getUsername());
 
-        log.info(String.format("User %s is trying to accept request %s", currentUser.getId(), requestId));
+        logger.info(String.format("User %s is trying to accept request %s", currentUser.getId(), requestId));
 
 
         friendService.acceptFriendRequest(requestId, currentUser.getId());

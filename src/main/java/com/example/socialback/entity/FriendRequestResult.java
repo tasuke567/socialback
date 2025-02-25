@@ -1,4 +1,4 @@
-package com.example.socialback.model;
+package com.example.socialback.entity;
 
 public enum FriendRequestResult {
     SENT,
