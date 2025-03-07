@@ -1,0 +1,154 @@
+{
+	"info": {
+		"_postman_id": "a100ed12-3da0-4e9e-83fc-122796ab184b",
+		"name": "Message API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "30204995"
+	},
+	"item": [
+		{
+			"name": "send",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/messages/send?receiverId=bf1ce603-f245-4e6b-a04e-3aac246f8acd&content=Hello, this is a test message",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"messages",
+						"send"
+					],
+					"query": [
+						{
+							"key": "receiverId",
+							"value": "bf1ce603-f245-4e6b-a04e-3aac246f8acd"
+						},
+						{
+							"key": "content",
+							"value": "Hello, this is a test message"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Conversations",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/messages/conversations",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"messages",
+						"conversations"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Conversations",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_token}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"friendId\": \"1decf128-0e5f-4a50-a81d-15b60ec9e6f3\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{base_url}}/api/messages/conversation",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"messages",
+						"conversation"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "ConversationsId",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/messages/{{conversationsId}}",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"messages",
+						"{{conversationsId}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Conversations",
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/messages/{{messageId}}",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"messages",
+						"{{messageId}}"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

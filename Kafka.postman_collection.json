@@ -1,0 +1,128 @@
+{
+	"info": {
+		"_postman_id": "4a3318fc-e330-4487-a2d5-a583f88ec971",
+		"name": "Kafka",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "30204995"
+	},
+	"item": [
+		{
+			"name": "Chat",
+			"item": [
+				{
+					"name": "chat send",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"conversationId\": \"ad417c18-853c-407d-95cc-f63d9b3c4933\",\r\n  \"senderId\": \"075e6be9-282e-41cf-83cb-3a4bbc491951\",\r\n  \"receiverId\": \"987f6543-cba9-8765-4321-654321fedcba\",\r\n  \"message\": \"OK\",\r\n  \"timestamp\": \"2025-03-06T12:00:00Z\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/chat/send",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"chat",
+								"send"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "chat send Copy",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/chat/history/ad417c18-853c-407d-95cc-f63d9b3c4933",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"chat",
+								"history",
+								"ad417c18-853c-407d-95cc-f63d9b3c4933"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "message",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/kafka/send?message=HelloKafka",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"kafka",
+						"send"
+					],
+					"query": [
+						{
+							"key": "message",
+							"value": "HelloKafka"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "post like",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"postId\": \"123e4567-e89b-12d3-a456-426614174000\",\r\n  \"userId\": \"987f6543-cba9-8765-4321-654321fedcba\",\r\n  \"username\": \"JohnDoe\",\r\n  \"timestamp\": \"2025-03-06T12:00:00Z\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{base_url}}/api/kafka/like",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"kafka",
+						"like"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
