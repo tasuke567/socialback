@@ -1,124 +1,120 @@
 package com.example.socialback.service;
 
-import com.example.socialback.dto.LoginRequest;
-import com.example.socialback.dto.RegisterRequest;
-import com.example.socialback.entity.UserEntity;
-import com.example.socialback.repository.UserRepository;
+import com.example.socialback.model.dao.AuthDAO;
+import com.example.socialback.model.dto.AuthResponse;
+import com.example.socialback.model.dto.LoginRequest;
+import com.example.socialback.model.dto.RegisterRequest;
+import com.example.socialback.model.entity.UserEntity;
 import com.example.socialback.security.JwtUtil;
-import org.springframework.beans.factory.annotation.Autowired;
+
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
+
+import com.example.socialback.model.dao.TokenRepository;
+import lombok.RequiredArgsConstructor;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.http.HttpStatus;
+import com.example.socialback.model.dao.UserInterestDAO;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+
 @Service
+@RequiredArgsConstructor
 public class AuthService {
-
-    @Autowired
-    private AuthenticationManager authenticationManager;
-
-    @Autowired
-    private UserRepository userRepository;  // JPA Repo ของ UserEntity
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private JwtUtil jwtUtil;
+    private final AuthDAO authDAO;
+    private final JwtUtil jwtUtil;
+    private final PasswordEncoder passwordEncoder;
+    private final TokenRepository tokenRepository;
+    private final UserService userService;
+    private final UserInterestDAO userInterestDAO;
 
     public ResponseEntity<?> register(RegisterRequest request) {
-        userRepository.findByEmail(request.getEmail()).ifPresent(u -> {
-            throw new RuntimeException("Email is already in use.");
-        });
+        if (authDAO.existsByUsername(request.getUsername())) {
+            return ResponseEntity.badRequest().body("Username already taken!");
+        }
 
-        // สร้าง UserEntity แทน
-        UserEntity newUser = UserEntity.builder()
-                .username(request.getUsername())
-                .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .firstName(request.getFirstName())
-                .lastName(request.getLastName())
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .roles("ROLE_USER")
-                .build();
+        UserEntity user = new UserEntity(
+                UUID.randomUUID(),
+                request.getUsername(),
+                request.getEmail(),
+                passwordEncoder.encode(request.getPassword()),
+                request.getFirstName(),
+                request.getLastName() );
+        authDAO.saveUser(user);
 
-        UserEntity savedUser = userRepository.save(newUser);
+        String token = jwtUtil.generateToken(user.getUsername(), user.getId().toString());
+        return ResponseEntity.ok(new AuthResponse(token, "User registered successfully"));
+    }
 
-        // Create UserDetails from savedUser
-        UserDetails userDetails = new org.springframework.security.core.userdetails.User(
-                savedUser.getUsername(), 
-                savedUser.getPassword(), 
-                new ArrayList<>() // Add authorities if needed
-        );
+    
 
-        // Generate token using UserDetails
-        String token = jwtUtil.generateToken(userDetails, savedUser.getId().toString());
-        return ResponseEntity.ok(Map.of("token", token));
+    public ResponseEntity<?> getCurrentUser(String token) {
+        try {
+            String username = jwtUtil.extractUsername(token);
+            UserEntity user = authDAO.findByUsername(username);
+            if (user == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                     .body("Invalid token or user not found");
+            }
+            return ResponseEntity.ok(user);
+        } catch (ExpiredJwtException e) {
+            // Token is expired
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                 .body("Token expired");
+        } catch (JwtException e) {
+            // Token is invalid
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                 .body("Invalid token");
+        } catch (Exception e) {
+            // Other exceptions
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                 .body("An error occurred while processing the token");
+        }
+    }
+    
+
+    public void logout(String username) {
+        tokenRepository.deleteByUsername(username);
     }
 
     public ResponseEntity<?> login(LoginRequest request) {
-        // หาใน DB
-        UserEntity user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        // Check if the user has the required role (e.g., "ROLE_USER")
-        if (!user.getRoles().contains("ROLE_USER")) { // Assuming roles are stored as a List<String>
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Access denied"));
+        // สมมุติว่าได้ตรวจสอบ username/password แล้ว
+        UserEntity user = userService.findByUsername(request.getUsername());
+        if (user == null) {
+            return ResponseEntity.status(401).body("Invalid credentials");
         }
 
-        try {
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
-            );
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+        // สร้าง JWT token โดยส่ง username และ userId
+        String token = jwtUtil.generateToken(user.getUsername(), user.getId().toString());
 
-            // Create UserDetails from user
-            UserDetails userDetails = new org.springframework.security.core.userdetails.User(
-                    user.getUsername(), 
-                    user.getPassword(), 
-                    new ArrayList<>() // Add authorities if needed
-            );
+        // ตรวจสอบข้อมูลในตาราง user_interests โดยใช้ DAO
+        boolean hasInterests = !userInterestDAO.findByUserId(user.getId()).isEmpty();
 
-            // Generate token using UserDetails
-            String token = jwtUtil.generateToken(userDetails, user.getId().toString());
-            return ResponseEntity.ok(Map.of("token", token));
+        // รวมข้อมูล response ส่งกลับไปยัง client
+        Map<String, Object> responseBody = new HashMap<>();
+        responseBody.put("token", token);
+        responseBody.put("hasInterests", hasInterests);
 
-        } catch (BadCredentialsException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Bad credentials"));
+        return ResponseEntity.ok(responseBody);
+    }
+
+    public boolean checkUserInterests(String username) {
+        // ดึงข้อมูลผู้ใช้จากฐานข้อมูลโดยใช้ username
+        UserEntity user = authDAO.findByUsername(username);
+        if (user == null) {
+            // ถ้าไม่พบผู้ใช้ คุณอาจเลือกที่จะส่ง false หรือโยน exception ก็ได้
+            return false;
         }
+        // ตรวจสอบว่าผู้ใช้มีความสนใจหรือไม่ โดยดูว่าผลลัพธ์ของ DAO ว่างหรือไม่
+        return !userInterestDAO.findByUserId(user.getId()).isEmpty();
     }
 
-    public ResponseEntity<?> getCurrentUser(String token) {
-        // Validate the token and extract user information
-        String username = jwtUtil.extractUsername(token); // Assuming you have a JwtUtil for token handling
-        UserEntity user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        return ResponseEntity.ok(user);
-    }
-
-    public ResponseEntity<UserEntity> getUserId(String token) {
-        String userId = jwtUtil.extractUserId(token); 
-        UserEntity user = userRepository.findById(UUID.fromString(userId))
-            .orElseThrow(() -> new RuntimeException("User not found"));
-        return ResponseEntity.ok(user);
-    }
-
-    public String getToken(UserDetails userDetails) {
-        // Assuming you have a way to get the token from the SecurityContext or another source
-        // This is a placeholder; you may need to adjust based on your actual implementation
-        return SecurityContextHolder.getContext().getAuthentication().getCredentials().toString();
-    }
+    
+    
 }

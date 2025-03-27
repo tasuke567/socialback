@@ -1,163 +1,122 @@
 package com.example.socialback.service;
 
-import com.example.socialback.entity.FriendshipEntity;
-import com.example.socialback.entity.UserEntity;
-import com.example.socialback.entity.FriendRequestEntity;
-import com.example.socialback.repository.FriendRequestRepository;
-import com.example.socialback.repository.FriendshipRepository;
-import com.example.socialback.repository.UserRepository;
-import jakarta.transaction.Transactional;
+import com.example.socialback.model.dao.FriendDAO;
+import com.example.socialback.model.dto.FriendRequestDTO;
+import com.example.socialback.model.dto.UserDTO;
+import com.example.socialback.model.entity.FriendshipStatus;
+import com.example.socialback.model.entity.UserEntity;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
-@Transactional
 @RequiredArgsConstructor
 public class FriendService {
+    private final FriendDAO friendDAO;
+    private static final Logger logger = LoggerFactory.getLogger(FriendService.class);
 
-    private final FriendshipRepository friendshipRepository;
-    private final FriendRequestRepository friendRequestRepository; // เดี๋ยวจะมีตัวอย่าง FriendRequestEntity อีกที
-    private final UserRepository userRepository; // ใช้ JPA Repo ของ UserEntity
-
-    public List<UserEntity> getUserFriends(UUID userId) {
-        // เช็ค user มีอยู่จริง
-        UserEntity user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        // ดึง List ของ UUID friendId จาก FriendshipEntity
-        List<UUID> friendIds = friendshipRepository.findAllFriendIds(userId);
-
-        // เอา friendIds มาหา UserEntity
-        return userRepository.findAllById(friendIds);
+    // ดึงเพื่อนของ user
+    public List<UserEntity> getFriends(UUID userId) {
+        return friendDAO.getFriends(userId);
     }
 
-    public boolean areFriends(UUID userId1, UUID userId2) {
-        return friendshipRepository.areFriends(userId1, userId2);
+    // ดึงเพื่อนของ user
+    public List<UserEntity> getSuggestions(UUID userId) {
+        return friendDAO.getSuggestions(userId);
     }
 
-    public void createFriendship(UUID userId1, UUID userId2) {
-        // Check if the friendship already exists
-        if (friendshipRepository.areFriends(userId1, userId2)) {
-            throw new RuntimeException("Friendship already exists");
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-        
-        // Create and save the friendship entities
-        FriendshipEntity friendship1 = FriendshipEntity.builder()
-                .userId(userId1)
-                .friendId(userId2)
-                .status("ACCEPTED")
-                .createdAt(now)
-                .updatedAt(now)
-                .build();
-        
-        FriendshipEntity friendship2 = FriendshipEntity.builder()
-                .userId(userId2)
-                .friendId(userId1)
-                .status("ACCEPTED")
-                .createdAt(now)
-                .updatedAt(now)
-                .build();
-        
-        friendshipRepository.save(friendship1);
-        friendshipRepository.save(friendship2);
+    // ดึงคำขอเป็นเพื่อน
+    public List<FriendRequestDTO> getRequests(UUID userId) {
+        return friendDAO.getRequests(userId);
     }
 
-    public void removeFriendship(UUID userId1, UUID userId2) {
-        friendshipRepository.removeFriendship(userId1, userId2);
+    // ดึงเพื่อนของ user
+    public List<UserDTO> getUserFriends(UUID userId) {
+        return friendDAO.getUserFriends(userId);
     }
 
+    // ดึงรายการคำขอเป็นเพื่อนที่ยังรอการตอบรับ (incoming)
+    public List<FriendRequestDTO> getPendingRequests(UUID userId) {
+        return friendDAO.getPendingRequests(userId);
+    }
+
+    // ดึงรายการคำขอเป็นเพื่อนที่ส่งออกไป (outgoing) โดย user ที่เป็นผู้ส่ง
+    public List<FriendRequestDTO> getSentFriendRequests(UUID userId) {
+        return friendDAO.getSentFriendRequests(userId);
+    }
+
+    // ดึงรายชื่อเพื่อนแนะนำ
+    public List<UserDTO> getFriendSuggestions(UUID userId) {
+        return friendDAO.getFriendSuggestions(userId);
+    }
+
+    @Transactional
     public FriendRequestResult sendFriendRequest(UUID fromUserId, UUID toUserId) {
-        // Check if the friend request already exists
-        if (friendRequestRepository.findPendingRequest(fromUserId, toUserId).isPresent()) {
-            return FriendRequestResult.ALREADY_PENDING; // Return if a request is already pending
+        // 🛑 Validation: ป้องกันการส่งคำขอไปหา null user
+        Objects.requireNonNull(fromUserId, "fromUserId must not be null");
+        Objects.requireNonNull(toUserId, "toUserId must not be null");
+
+        // ❌ ป้องกันการส่งคำขอหาตัวเอง
+        if (fromUserId.equals(toUserId)) {
+            logger.warn("⚠️ User [{}] tried to send friend request to themselves!", fromUserId);
+            return FriendRequestResult.INVALID_REQUEST;
         }
 
-        // Check if they are already friends
-        if (friendshipRepository.areFriends(fromUserId, toUserId)) {
-            return FriendRequestResult.ALREADY_FRIENDS; // Return if they are already friends
+        logger.info("📨 User [{}] is sending a friend request to [{}]", fromUserId, toUserId);
+
+        // 🎯 เรียก DAO และจัดการ Response
+        Optional<FriendRequestResult> result = Optional.ofNullable(friendDAO.sendFriendRequest(fromUserId, toUserId));
+
+        if (result.isEmpty()) {
+            logger.error("❌ Unexpected error while sending friend request from [{}] to [{}]", fromUserId, toUserId);
+            return FriendRequestResult.INVALID_REQUEST;
         }
 
-        // Create and save the new friend request
-        FriendRequestEntity friendRequest = FriendRequestEntity.builder()
-                .fromUserId(fromUserId)
-                .toUserId(toUserId)
-                .status("PENDING") // Set status to PENDING
-                .createdAt(LocalDateTime.now())
-                .build();
-
-        friendRequestRepository.save(friendRequest);
-        return FriendRequestResult.SENT; // Return success result
+        // 🟢 Log result และ return ค่าที่ได้
+        logger.info("✅ Friend request result: [{}]", result.get());
+        return result.get();
     }
 
-    public boolean cancelFriendRequest(UUID requestId, UUID userId) {
-        FriendRequestEntity request = friendRequestRepository.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Request not found"));
-
-        // Check if the user is authorized to cancel the request
-        if (!request.getFromUserId().equals(userId)) {
-            throw new RuntimeException("Not authorized to cancel this request");
-        }
-
-        friendRequestRepository.deleteById(requestId);
-        return true; // Return true if cancellation was successful
+    // ยอมรับคำขอเป็นเพื่อน
+    @Transactional
+    public boolean acceptFriendRequest(UUID requestId, UUID currentUserId) {
+        return friendDAO.acceptFriendRequest(requestId, currentUserId);
     }
 
+    // ปฏิเสธคำขอเป็นเพื่อน
+    @Transactional
+    public boolean declineFriendRequest(UUID requestId, UUID currentUserId) {
+        return friendDAO.declineFriendRequest(requestId, currentUserId);
+    }
+
+    // ยกเลิกคำขอเป็นเพื่อนที่ส่งออกไป (โดยผู้ส่ง)
+    @Transactional
+    public boolean cancelFriendRequest(UUID fromUserId, UUID toUserId) {
+        return friendDAO.cancelFriendRequest(fromUserId, toUserId);
+    }
+
+    // ลบเพื่อนออกจากรายชื่อ
+    @Transactional
     public void removeFriend(UUID userId, UUID friendId) {
-        // Check if the friendship exists
-        if (!friendshipRepository.areFriends(userId, friendId)) {
-            throw new RuntimeException("Not friends or friendship does not exist");
-        }
-        
-        // Remove the friendship
-        friendshipRepository.removeFriendship(userId, friendId);
+        friendDAO.removeFriend(userId, friendId);
     }
 
-    public boolean checkFriendship(UUID userId1, UUID userId2) {
-        return friendshipRepository.areFriends(userId1, userId2);
+    // 🆕 ✅ เพิ่มฟังก์ชันเช็คสถานะความสัมพันธ์
+    public FriendshipStatus getFriendshipStatus(UUID userId, UUID targetUserId) {
+        if (friendDAO.areFriends(userId, targetUserId)) {
+            return FriendshipStatus.ACCEPTED; // ✅ เป็นเพื่อนกันแล้ว
+        }
+        if (friendDAO.hasPendingRequest(userId, targetUserId)) {
+            return FriendshipStatus.PENDING; // 📩 มีคำขอเป็นเพื่อนอยู่
+        }
+        return FriendshipStatus.NONE; // ❌ ยังไม่ได้เป็นเพื่อนกัน
     }
 
-    public void acceptFriendRequest(UUID requestId, UUID userId) {
-        FriendRequestEntity request = friendRequestRepository.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Friend request not found"));
-
-        if (!request.getToUserId().equals(userId)) {
-            throw new RuntimeException("Not authorized to accept this request");
-        }
-
-        if (!"PENDING".equals(request.getStatus())) {
-            throw new RuntimeException("Request not pending");
-        }
-
-        // Create friendship
-        LocalDateTime now = LocalDateTime.now();
-        FriendshipEntity friendship1 = FriendshipEntity.builder()
-                .userId(request.getFromUserId())
-                .friendId(request.getToUserId())
-                .status("ACCEPTED")
-                .createdAt(now)
-                .updatedAt(now)
-                .build();
-
-        FriendshipEntity friendship2 = FriendshipEntity.builder()
-                .userId(request.getToUserId())
-                .friendId(request.getFromUserId())
-                .status("ACCEPTED")
-                .createdAt(now)
-                .updatedAt(now)
-                .build();
-
-        friendshipRepository.save(friendship1);
-        friendshipRepository.save(friendship2);
-
-        // Delete the friend request
-        friendRequestRepository.deleteById(requestId);
-    }
-
-    // etc. สำหรับ manage FriendRequests
 }

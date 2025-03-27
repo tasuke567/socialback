@@ -3,10 +3,10 @@ package com.example.socialback.security;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
-
-import com.example.socialback.entity.UserEntity;
+import com.example.socialback.model.entity.UserEntity;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.stream.Collectors;
 import java.util.Arrays;
 
@@ -19,7 +19,11 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return user.getRoles().stream()
+        if (user.getRoles() == null || user.getRoles().isEmpty()) {
+            return List.of(new SimpleGrantedAuthority("ROLE_USER")); // ✅ Default Role
+        }
+        return Arrays.stream(user.getRoles().split(","))
+                .map(String::trim)
                 .map(SimpleGrantedAuthority::new)
                 .collect(Collectors.toList());
     }
@@ -36,25 +40,24 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public boolean isAccountNonExpired() {
-        return true;
+        return user.isAccountNonExpired();
     }
 
     @Override
     public boolean isAccountNonLocked() {
-        return true;
+        return user.isAccountNonLocked();
     }
 
     @Override
     public boolean isCredentialsNonExpired() {
-        return true;
+        return user.isCredentialsNonExpired();
     }
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return user.isEnabled();
     }
 
-    // คุณสามารถเพิ่ม getter สำหรับ User หากต้องการเข้าถึง object นี้ในภายหลัง
     public UserEntity getUser() {
         return user;
     }
